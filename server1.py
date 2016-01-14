@@ -62,7 +62,6 @@ class FileServer:
 					msgType = dicData['msgType']
 					print("message type received:", msgType)
 					if msgType == CONS.from_client_01: #上传
-						print("execute:", CONS.from_client_01)
 						threads = []
 						if upLoadTime == -1:
 							upLoadTime = 1
@@ -71,13 +70,15 @@ class FileServer:
 
 						thread = threading.Thread(target=self.fromClientUploadmsgHandler,
 												  args=(conn, dicData))#开启进程处理文件上传
-						threads.append(thread)
-						thread.start()
 
-						for t in threads:
+						self.threads.append(thread)
+						thread.start()
+						for t in self.threads:
 							t.join()
+
 						endtime = datetime.datetime.now()
-						logging.info('服务器结束上传文件时间：{0}'.format(starttime))
+						logging.info('服务器结束上传文件时间：{0}'.format(endtime))
+						logging.info('当前所用时间：{0}'.format(endtime - starttime))
 					elif msgType == CONS.from_client_02: #下载
 						print("execute:", CONS.from_client_02)
 						self.threads = []
@@ -94,7 +95,7 @@ class FileServer:
 							t.join()
 
 						endtime = datetime.datetime.now()
-						logging.info('服务器开始结束上传文件时间：{0}'.format(starttime))
+						logging.info('服务器结束上传文件时间：{0}'.format(endtime))
 					else:
 						conn.close()
 						logging.info('message type error')
@@ -105,7 +106,7 @@ class FileServer:
 
 	def fromClientUploadmsgHandler(self, client, dicData = []):
 		#back file list
-		print("execute: fromClientUploadmsgHandler")
+		# print("execute: fromClientUploadmsgHandler")
 		if 'fileName'in dicData:
 			fileName = dicData['fileName'].rstrip()
 			content = ""
@@ -115,7 +116,6 @@ class FileServer:
 				content = content + tempRevContent
 				if tempRevContent[-1] == '$':
 					content = content[0:-1]
-					print("end file receive")
 					break
 
 			print("final content length:", len(content))

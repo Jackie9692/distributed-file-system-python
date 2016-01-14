@@ -75,12 +75,12 @@ class Filemonitor:
 			self.aliveServerData.append(serverDic)
 
 			# #for simulate 4machine
-			# serverDic1 = dict()
-			# serverDic1['ip'] = dicData['ip']
-			# serverDic1['port'] = dicData['port']
-			# serverDic1['blockStart'] = 0
-			# serverDic1['blockEnd'] = 0
-			# self.aliveServerData.append(serverDic1)
+			serverDic1 = dict()
+			serverDic1['ip'] = dicData['ip']
+			serverDic1['port'] = dicData['port']
+			serverDic1['blockStart'] = 0
+			serverDic1['blockEnd'] = 0
+			self.aliveServerData.append(serverDic1)
 		else:
 			logging.warn('can not get server connection necessary info')
 
