@@ -1,0 +1,6 @@
+*.pyc
+*.avi
+*.txt
+data*
+.idea
+log
