@@ -4,9 +4,12 @@ __author__ = 'Jackie'
 import shutil
 import os
 from socket import *
+import math
 import logging
 import pickle
 import threading
+import time
+import datetime
 from utils import constant as CONS
 
 class Filemonitor:
@@ -15,7 +18,7 @@ class Filemonitor:
 		self.ip = gethostbyname(gethostname())
 		self.port = port
 		self.aliveServerData = []#活着的服务器信息
-		self.fileInfo = dict() #上传文件的文件名和block大小
+		self.fileInfo = [] #上传文件的文件名和block大小
 
 		logging.info('monitor running at {0:s}:{1:4d}'.format(self.ip, self.port))
 		try:
@@ -24,70 +27,14 @@ class Filemonitor:
 			self.monitor.listen(5) # Max connections
 			logging.info('monitor start successfully...')
 		except Exception as e:
-			logging.warn("socket create fail{exec}".format(exce=e))#socket create fail
+			logging.warning("socket create fail{exec}".format(exce=e))
+
+		#开启服务心跳检测
+		thread = threading.Thread(target=self.checkServerStatus, args=())
+		thread.start()
 
 		#start to listen port
 		self.waitConnection()
-
-
-	#向客户端返回上传服务器信息
-	def sendServerUploadInfoToClient(self, dicData, client):
-		if 'blockSize' in dicData and 'fileName' in dicData:
-			self.fileInfo['fileName'] = dicData['fileName']
-			self.fileInfo['blockSize'] =  dicData['blockSize']
-			aliveLength = len(self.aliveServerData) #只考虑为四台或三台
-		else:
-			logging.warn("can not get necessary information(blocksize) form client")
-			return
-		# 两台服务器直接接受客户端文件  and 一台或两台通过服务器备份
-		firstServerFileEndSize = int(dicData['blockSize']/2)
-
-		self.aliveServerData[0]['blockStart'] = 1
-		self.aliveServerData[0]['blockEnd'] = firstServerFileEndSize
-		self.aliveServerData[1]['blockStart'] = firstServerFileEndSize + 1
-		self.aliveServerData[1]['blockEnd'] = dicData['blockSize']
-		if aliveLength == 3: #上传时就已经损坏一台
-			self.aliveServerData[2]['blockStart'] = 1
-			self.aliveServerData[2]['blockEnd'] = dicData['blockSize']
-		elif aliveLength == 4:
-			self.aliveServerData[2]['blockStart'] = 1
-			self.aliveServerData[2]['blockEnd'] = firstServerFileEndSize
-			self.aliveServerData[3]['blockStart'] = firstServerFileEndSize + 1
-			self.aliveServerData[3]['blockEnd'] = dicData['blockSize']
-		else:
-			logging.warn("the server number is not right")
-		packetData = pickle.dumps(self.aliveServerData)
-		client.send(packetData)
-		logging.info("send server info: '{0}' to monitor".format(packetData))
-
-	#向客户端返回下载服务器信息
-	def sendServerDownloadInfoToClient(self):
-		pass
-
-	# 服务器信息初始化
-	def initServerInfo(self, dicData):
-		if 'ip' in dicData and 'port' in dicData:
-			serverDic = dict()
-			serverDic['ip'] = dicData['ip']
-			serverDic['port'] = dicData['port']
-			serverDic['blockStart'] = 0
-			serverDic['blockEnd'] = 0
-			self.aliveServerData.append(serverDic)
-
-			# #for simulate 4machine
-			serverDic1 = dict()
-			serverDic1['ip'] = dicData['ip']
-			serverDic1['port'] = dicData['port']
-			serverDic1['blockStart'] = 0
-			serverDic1['blockEnd'] = 0
-			self.aliveServerData.append(serverDic1)
-		else:
-			logging.warn('can not get server connection necessary info')
-
-	# 刷新服务器信息
-	def refreshServerInfo(self):
-		for each in self.aliveServerData:
-			each['timeRefresh'] = 'hah'
 
 
 	def waitConnection(self):
@@ -100,23 +47,146 @@ class Filemonitor:
 				dicData = pickle.loads(helloMsg)
 				if 'msgType' in dicData:
 					msgType = dicData['msgType']
+					print("Message type received:", msgType)
 					if msgType == CONS.from_client_03: #上传
 						self.sendServerUploadInfoToClient(dicData, conn)
 					elif msgType == CONS.from_client_04: #下载
 						self.sendServerDownloadInfoToClient(dicData, conn)
 					elif msgType == CONS.from_server_01: #服务器创建状态
 						self.initServerInfo(dicData)
+						conn.close()
 					elif msgType == CONS.from_server_02: #服务器运行状态
-						self.refreshServerInfo(dicData)
+						self.refreshServerInfor(dicData)
+						conn.close()
 				else:
 					logging.info("can't get message type")
 					continue
-
 			except Exception as e:
 				logging.error('monitor fail.{0}'.format(e))
 			finally:
 				conn.close()
 
+	#向客户端返回上传服务器信息
+	def sendServerUploadInfoToClient(self, dicData, client):
+		if 'blockSize' in dicData and 'fileName' in dicData:
+			aliveLength = len(self.aliveServerData) #只考虑为四台或三台
+		else:
+			logging.warning("can not get necessary information(blocksize) form client")
+			return -1
+
+		#文件名不能已经存在
+		for fileInfo in self.fileInfo:
+			if fileInfo["fileName"] == dicData['fileName']:
+				logging.warning("上传文件已存在，请检查文件名")
+				return -1
+
+		# 两台服务器直接接受客户端文件  and 一台或两台通过服务器备份
+		firstServerFileEndSize = math.ceil(dicData['blockSize']/2)
+
+		self.aliveServerData[0]['blockStart'] = 1
+		self.aliveServerData[0]['blockEnd'] = firstServerFileEndSize
+		self.aliveServerData[1]['blockStart'] = firstServerFileEndSize + 1
+		self.aliveServerData[1]['blockEnd'] = dicData['blockSize']
+
+		if aliveLength == 3: #上传时就已经损坏一台
+			self.aliveServerData[2]['blockStart'] = 1
+			self.aliveServerData[2]['blockEnd'] = dicData['blockSize']
+		elif aliveLength == 4:
+			self.aliveServerData[2]['blockStart'] = 1
+			self.aliveServerData[2]['blockEnd'] = firstServerFileEndSize
+			self.aliveServerData[3]['blockStart'] = firstServerFileEndSize + 1
+			self.aliveServerData[3]['blockEnd'] = dicData['blockSize']
+		else:
+			logging.warning("the server number is not right")
+
+		fileInfo = dict()#保存文件信息
+		fileInfo['fileName'] = dicData['fileName']
+		fileInfo['blockSize'] = dicData['blockSize']
+		fileInfo["serverPosition"] = []
+		for server in self.aliveServerData:
+			tempPostionInfo = dict()
+			tempPostionInfo["ip"] = server["ip"]
+			tempPostionInfo["port"] = server["port"]
+			tempPostionInfo["blockStart"] = server["blockStart"]
+			tempPostionInfo["blockEnd"] = server["blockEnd"]
+			fileInfo["serverPosition"].append(tempPostionInfo)
+
+		self.fileInfo.append(fileInfo)
+
+
+		packetData = pickle.dumps(self.aliveServerData)
+		client.send(packetData)
+		client.close()
+		logging.info("发送上传文件信息到客户端: '{0}' to monitor".format(pickle.unpack(packetData)))
+
+	#向客户端返回下载服务器信息
+	def sendServerDownloadInfoToClient(self, dicData, client):
+		fileName = dicData['fileName']
+
+		fileServerInfor = []
+		for fileInfo in self.fileInfo:
+			if fileInfo["fileName"] == fileName:
+				blockSize = fileInfo["blockSize"]
+				for i in range(2):
+					if i == 0:
+						for serverPosition in fileInfo["serverPosition"]:
+							if serverPosition["blockEnd"] < blockSize:
+								server1Infor = dict(serverPosition)
+								break
+					else:
+						for serverPosition in fileInfo["serverPosition"]:
+							if serverPosition["blockEnd"] == blockSize:
+								server1Infor = dict(serverPosition)
+								break
+					fileServerInfor.append(server1Infor)
+			else:
+				logging.warning("file information is not right!!")
+
+		packetData = pickle.dumps(fileServerInfor)
+		client.send(packetData)
+		client.close()
+		logging.info("发送下载文件信息到客户端: '{0}' to monitor".format(pickle.unpack(packetData)))
+
+	# 服务器信息初始化
+	def initServerInfo(self, dicData):
+		if 'ip' in dicData and 'port' in dicData:
+			serverDic = dict()
+			serverDic['ip'] = dicData['ip']
+			serverDic['port'] = dicData['port']
+			serverDic['blockStart'] = 0
+			serverDic['blockEnd'] = 0
+			serverDic['heartTime'] = datetime.datetime.now()
+			self.aliveServerData.append(serverDic)
+		else:
+			logging.warning('Can not get server connection necessary info')
+
+	#检查服务器状态
+	def checkServerStatus(self):
+		while True:
+			time.sleep(2.5)
+			now = datetime.datetime.now()
+			for each in self.aliveServerData[:]:
+				heartTime = each['heartTime']
+				if (now - heartTime).seconds >= 3:
+					logging.info("服务器{0}:{1}失效！".format(each["ip"], str(each["port"])))
+					self.aliveServerData.remove(each)
+				else:
+					each['heartTime'] = now
+
+
+	# 刷新服务器信息
+	def refreshServerInfor(self, dicData):
+		if 'ip' in dicData and 'port' in dicData:
+			ip = dicData['ip']
+			port = dicData['port']
+
+			now = datetime.datetime.now()
+			for each in self.aliveServerData[:]:
+				if each["ip"] == ip and each["port"] == port:
+					each["heartTime"] = now
+					logging.info("服务器{0}:{1}更新信息！".format(each["ip"], str(each["port"])))
+		else:
+			logging.warning('更新消息有误！')
 
 # initialize the log
 def initLog(logName):
@@ -137,7 +207,6 @@ def initLog(logName):
 if __name__ == "__main__":
 	initLog('monitor.log')
 	monitor = Filemonitor(CONS.PORT_START)
-	monitor.destroy()
 
 
 

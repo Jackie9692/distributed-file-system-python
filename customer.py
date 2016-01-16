@@ -9,13 +9,14 @@ import datetime
 import pickle
 import threading
 import sys
+import shutil
 from utils import constant as CONS
 
 class Client:
     #initialize the server
     def __init__(self, port):
-        self.uploadFileThreadNum = 1
-        self.downloadFileThreadNum = 1
+        self.uploadFileThreadNum = 10
+        self.downloadFileThreadNum = 4
         self.threads = []
         self.fileName = ""
         logging.info('client start...')
@@ -133,7 +134,7 @@ class Client:
                         label = i
                 else:
                     start = currentPos + eachThreadBlockFloorSize * (i - label - 1) + 1
-                    end =  currentPos + eachThreadBlockFloorSize * (i - label)
+                    end = currentPos + eachThreadBlockFloorSize * (i - label)
 
                 if i == len(tempLi)-1:
                     end = blockSize
@@ -183,19 +184,19 @@ class Client:
                 # print("packetData length:", len(packetData))
                 client.send(packetData)
 
-                with open('download{0}'.format(self.fileName), 'ab+') as f:
+                with open('temp/{0}'.format(fileName), 'wb') as f:
                     # print("position", currentPosition)
-                    f.seek(CONS.BLOCK_SIZE * (currentPosition - 1))
+                    # f.seek(CONS.BLOCK_SIZE * (currentPosition - 1))
                     while True:
                         revContent = client.recv(CONS.ONCE_READ_FILE_SIZE)
                         # fileSizeCount = fileSizeCount + len(revContent)
                         if not revContent:
-                            print("文件所在位置:", f.tell())
+                            print("file position:", f.tell())
                             break
                         f.write(revContent)
 
                 client.close()
-                logging.info("download file:{0} to server:{1}".format(fileName, serverIP))
+                logging.info("download file:{0} from server:{1}".format(fileName, serverIP))
             except Exception as e: #不考虑上传失败
                 client.close()
                 logging.error("send file:{0} to server:{1} fail! {2}".format(fileName, serverIP, e))
@@ -238,7 +239,7 @@ class Client:
                         label = i
                 else:
                     start = currentPos + eachThreadBlockFloorSize * (i - label - 1) + 1
-                    end =  currentPos + eachThreadBlockFloorSize * (i - label)
+                    end = currentPos + eachThreadBlockFloorSize * (i - label)
 
                 if i == len(tempLi)-1:
                     end = blockSize
@@ -278,19 +279,23 @@ class Client:
 
 # initialize the log
 def initLog(logName):
-    # createa log folder
-    if not os.path.isdir('log'):
-        os.mkdir('log')
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s', datefmt='%m-%d %H:%M', filename='log/' + logName)
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(levelname)-6s:%(message)s')
-    console.setFormatter(formatter)
-    logging.getLogger('').addHandler(console)
+	# createa log folder
+	if not os.path.isdir('log'):
+		os.mkdir('log')
+	logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s', datefmt='%m-%d %H:%M', filename='log/' + logName)
+	# define a Handler which writes INFO messages or higher to the sys.stderr
+	console = logging.StreamHandler()
+	console.setLevel(logging.INFO)
+	# set a format which is simpler for console use
+	formatter = logging.Formatter('%(levelname)-6s:%(message)s')
+	# tell the handler to use this format
+	console.setFormatter(formatter)
+	# add the handler to the root logger
+	logging.getLogger('').addHandler(console)
 
 
 if __name__ == "__main__":
-    initLog('client.log')
+    initLog('customer.log')
     client = Client(CONS.PORT_START + 5)
 
     commandLis = ["download", "upload", "abort"]
@@ -302,17 +307,29 @@ if __name__ == "__main__":
             fileName = input("请输入文件名:")
             starttime = datetime.datetime.now()
             logging.info('开始文件下载...{0}'.format(starttime))
-            client.uploadFile(fileName)
+            client.downloadFile(fileName)
             for t in client.threads:
                 t.join()
+
+            if os.path.isdir("temp"):
+                fileList = os.listdir("temp")
+
+                if not os.path.isdir("download"):
+                    os.mkdir("download")
+
+                with open('download/{0}'.format(client.fileName), 'wb') as f:
+                    for tempFile in fileList:
+                        shutil.copyfileobj(open('temp/{0}'.format(tempFile), 'rb'), f)
+
+                # shutil.rmtree("temp")
+
             endtime = datetime.datetime.now()
 
             logging.info('客户端结束时间：{0}'.format(endtime))
             logging.info('客户端所花时间：{0}'.format(endtime - starttime))
-            break
         elif inputCmd == commandLis[1]:
             starttime = datetime.datetime.now()
-            fileName = input("请输入文件名:{0}")
+            fileName = input("请输入文件名:")
             logging.info('开始文件上传...{0}'.format(starttime))
             client.uploadFile(fileName)
             for t in client.threads:
@@ -321,20 +338,11 @@ if __name__ == "__main__":
 
             logging.info('客户端结束时间：{0}'.format(endtime))
             logging.info('客户端所花时间：{0}'.format(endtime - starttime))
-            break
         elif inputCmd == commandLis[2]:
-            print("想好再来^=^")
+            print("想好操作再来^=^")
             sys.exit()
         else:
             print("输入不对,再来一遍！")
 
-    for t in client.threads:
-        t.join()
-    endtime = datetime.datetime.now()
-
-    # logging.info('客户端结束时间：{0}'.format(endtime))
-    # logging.info('客户端所花时间：{0}'.format(endtime - starttime))
-    #
-    # logging.warning('客户端开始时间：{0}'.format(starttime))
 
 
