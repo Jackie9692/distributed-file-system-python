@@ -109,7 +109,6 @@ class FileServer:
 						logging.info('message type error')
 
 			except Exception as e:
-				conn.close()
 				logging.error('connect to with client error.{0}'.format(e))
 
 	def fromClientUploadmsgHandler(self, client, dicData = []):
@@ -192,7 +191,7 @@ class FileServer:
 				packetData = pickle.dumps(packetDataDic)
 
 				socketConnect.send(packetData)
-				logging.info("Notify the monitor")
+				# logging.info("Notify the monitor")
 				socketConnect.close()
 				# logging.info("send server info: '{0}' to monitor".format(packetDataDic))
 			except Exception as e:
