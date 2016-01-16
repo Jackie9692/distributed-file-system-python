@@ -16,7 +16,7 @@ class Client:
     #initialize the server
     def __init__(self, port):
         self.uploadFileThreadNum = 10
-        self.downloadFileThreadNum = 4
+        self.downloadFileThreadNum = 10
         self.threads = []
         self.fileName = ""
         logging.info('client start...')
@@ -184,6 +184,9 @@ class Client:
                 # print("packetData length:", len(packetData))
                 client.send(packetData)
 
+                if not os.path.isdir('temp'):
+                    os.mkdir('temp')
+
                 with open('temp/{0}'.format(fileName), 'wb') as f:
                     # print("position", currentPosition)
                     # f.seek(CONS.BLOCK_SIZE * (currentPosition - 1))
@@ -208,7 +211,7 @@ class Client:
         serverInforLi = self.getInfoFromMonitor(CONS.from_client_04, fileName)
 
         if len(serverInforLi) < 2:
-            logging.warning("valid server is less than 2!!!")
+            logging.warning("服务器不存在此文件或数量不足以支持下载此文件！")
             return -1
 
 
@@ -321,7 +324,7 @@ if __name__ == "__main__":
                     for tempFile in fileList:
                         shutil.copyfileobj(open('temp/{0}'.format(tempFile), 'rb'), f)
 
-                # shutil.rmtree("temp")
+                shutil.rmtree("temp")
 
             endtime = datetime.datetime.now()
 

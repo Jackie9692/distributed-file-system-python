@@ -24,7 +24,7 @@ class Filemonitor:
 		try:
 			self.monitor = socket(AF_INET, SOCK_STREAM)
 			self.monitor.bind(('', self.port))
-			self.monitor.listen(5) # Max connections
+			self.monitor.listen(20) # Max connections
 			logging.info('monitor start successfully...')
 		except Exception as e:
 			logging.warning("socket create fail{exec}".format(exce=e))
@@ -56,8 +56,8 @@ class Filemonitor:
 						self.initServerInfo(dicData)
 						conn.close()
 					elif msgType == CONS.from_server_02: #服务器运行状态
-						self.refreshServerInfor(dicData)
-						conn.close()
+						thread = threading.Thread(target=self.refreshServerInfor, args=(dicData, conn))
+						thread.start()
 				else:
 					logging.info("can't get message type")
 					continue
@@ -122,26 +122,27 @@ class Filemonitor:
 	#向客户端返回下载服务器信息
 	def sendServerDownloadInfoToClient(self, dicData, client):
 		fileName = dicData['fileName']
-
+		fileExist = False
 		fileServerInfor = []
 		for fileInfo in self.fileInfo:
 			if fileInfo["fileName"] == fileName:
+				fileExist = True
 				blockSize = fileInfo["blockSize"]
-				for i in range(2):
-					if i == 0:
-						for serverPosition in fileInfo["serverPosition"]:
-							if serverPosition["blockEnd"] < blockSize:
-								server1Infor = dict(serverPosition)
-								break
-					else:
-						for serverPosition in fileInfo["serverPosition"]:
-							if serverPosition["blockEnd"] == blockSize:
-								server1Infor = dict(serverPosition)
-								break
-					fileServerInfor.append(server1Infor)
+				#返回两个server供下载
+				for serverPosition in fileInfo["serverPosition"]:
+					if serverPosition["blockEnd"] < blockSize:
+						fileServerInfor.append(dict(serverPosition))
+						break
+				for serverPosition in fileInfo["serverPosition"]:
+					if serverPosition["blockEnd"] == blockSize:
+						fileServerInfor.append(dict(serverPosition))
+						break
 			else:
 				logging.warning("file information is not right!!")
-
+		if not fileExist:
+			logging.warning("服务器不存在此文件")
+		if len(fileServerInfor) < 2:
+			logging.warning("服务器数量不足")
 		packetData = pickle.dumps(fileServerInfor)
 		client.send(packetData)
 		client.close()
@@ -170,12 +171,14 @@ class Filemonitor:
 				if (now - heartTime).seconds >= 3:
 					logging.info("服务器{0}:{1}失效！".format(each["ip"], str(each["port"])))
 					self.aliveServerData.remove(each)
-				else:
-					each['heartTime'] = now
-
+					for fileInfo in self.fileInfo:
+						for serverPosition in fileInfo["serverPosition"][:]:
+							if serverPosition["ip"] == each["ip"] and serverPosition["port"] == each["port"]:
+								fileInfo["serverPosition"].remove(serverPosition)
 
 	# 刷新服务器信息
-	def refreshServerInfor(self, dicData):
+	def refreshServerInfor(self, dicData, client):
+		client.close()
 		if 'ip' in dicData and 'port' in dicData:
 			ip = dicData['ip']
 			port = dicData['port']

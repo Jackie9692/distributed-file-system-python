@@ -6,7 +6,7 @@ define some constant here
 """
 
 #about the ip and port
-MONITOR__SERVER_IP = "localhost" #monitor static ip and port
+MONITOR__SERVER_IP = "192.168.3.74" #monitor static ip and port
 MONITOR__SERVER_PORT = 5001
 
 SERVER_IP_LENGTH = 15 #255.255.192.108

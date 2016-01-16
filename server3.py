@@ -8,6 +8,7 @@ import logging
 import pickle
 import threading
 import datetime
+import time
 from utils import constant as CONS
 
 class FileServer:
@@ -27,8 +28,14 @@ class FileServer:
 
 		# notify the monitor
 		self.notifyConnect()
+
+		# 更新服务器状态线程开启
+		thread = threading.Thread(target=self.notityAlive, args=())
+		thread.start()
+
 		#start to listen port
 		self.waitConnection()
+
 
 	def notifyConnect(self):
 		try:
@@ -42,7 +49,7 @@ class FileServer:
 			packetData = pickle.dumps(packetDataDic)
 
 			socketConnect.send(packetData)
-			logging.info("Notify the monitor start")
+			logging.info("Notify the monitor")
 			# logging.info("send server info: '{0}' to monitor".format(packetDataDic))
 		except Exception as e:
 			socketConnect.close()
@@ -61,7 +68,7 @@ class FileServer:
 				dicData = pickle.loads(msgDic)
 				if 'msgType' in dicData and 'fileName'in dicData:
 					msgType = dicData['msgType']
-					print("message type received:", msgType)
+					print("Message type received:", msgType)
 					if msgType == CONS.from_client_01: #上传与备份同一个方法处理
 						threads = []
 						if upLoadTime == -1:
@@ -81,22 +88,22 @@ class FileServer:
 						logging.info('服务器结束上传文件时间：{0}'.format(endtime))
 						logging.info('当前所用时间：{0}'.format(endtime - starttime))
 					elif msgType == CONS.from_client_02: #下载
-						print("execute:", CONS.from_client_02)
 						self.threads = []
 						if downLoadTime == -1:
 							upLoadTime = 1
 							starttime = datetime.datetime.now()  #统计服务器从开始下载文件到结束文件下载时间
-							logging.info('服务器开始接收下载文件时间：{0}'.format(starttime))
+							logging.info('服务器开始发送下载文件：{0}'.format(starttime))
 
 						thread = threading.Thread(target=self.fromClientDownloadmsgHandler,
 												  args=(conn, dicData))#开启进程处理文件下载
 						self.threads.append(thread)
+
 						thread.start()
 						for t in self.threads:
 							t.join()
 
 						endtime = datetime.datetime.now()
-						logging.info('服务器结束上传文件时间：{0}'.format(endtime))
+						logging.info('服务器结束发送下载文件：{0}'.format(endtime))
 					else:
 						conn.close()
 						logging.info('message type error')
@@ -123,7 +130,7 @@ class FileServer:
 
 					packetData = pickle.dumps(dicData)
 					#传递上传文件基本信息
-					print("packetData length:", len(packetData))
+					# print("packetData length:", len(packetData))
 					backServerConnect.send(packetData)
 
 				except Exception as e: #不考虑上传失败
@@ -167,11 +174,30 @@ class FileServer:
 			# print("length of file send", fileSizeCount)
 			client.close()
 		else:
+			client.close()
 			logging.info('Message error!')
 
 	# visite the monitor continuously
 	def notityAlive(self):
-		pass
+		while True:
+			time.sleep(2)
+			try:
+				socketConnect = socket(AF_INET, SOCK_STREAM)
+				socketConnect.connect((CONS.MONITOR__SERVER_IP, CONS.MONITOR__SERVER_PORT))
+
+				packetDataDic = dict()
+				packetDataDic['msgType'] = CONS.from_server_02
+				packetDataDic['ip'] = self.ip
+				packetDataDic['port'] = self.port
+				packetData = pickle.dumps(packetDataDic)
+
+				socketConnect.send(packetData)
+				logging.info("Notify the monitor")
+				socketConnect.close()
+				# logging.info("send server info: '{0}' to monitor".format(packetDataDic))
+			except Exception as e:
+				socketConnect.close()
+				logging.error('Connect to monitor fail! {0}'.format(e))
 
 
 	def destroy(self):

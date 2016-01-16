@@ -30,8 +30,8 @@ class FileServer:
 		self.notifyConnect()
 
 		# 更新服务器状态线程开启
-		# thread = threading.Thread(target=self.notityAlive, args=())
-		# thread.start()
+		thread = threading.Thread(target=self.notityAlive, args=())
+		thread.start()
 
 		#start to listen port
 		self.waitConnection()
@@ -109,7 +109,6 @@ class FileServer:
 						logging.info('message type error')
 
 			except Exception as e:
-				conn.close()
 				logging.error('connect to with client error.{0}'.format(e))
 
 	def fromClientUploadmsgHandler(self, client, dicData = []):
@@ -173,9 +172,9 @@ class FileServer:
 					client.send(content)
 			# print("length of file send", fileSizeCount)
 			client.close()
-		# else:
-		# 	client.close()
-		# 	logging.info('Message error!')
+		else:
+			client.close()
+			logging.info('Message error!')
 
 	# visite the monitor continuously
 	def notityAlive(self):
@@ -192,7 +191,7 @@ class FileServer:
 				packetData = pickle.dumps(packetDataDic)
 
 				socketConnect.send(packetData)
-				logging.info("Notify the monitor")
+				# logging.info("Notify the monitor")
 				socketConnect.close()
 				# logging.info("send server info: '{0}' to monitor".format(packetDataDic))
 			except Exception as e:
