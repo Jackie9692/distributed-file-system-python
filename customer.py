@@ -54,7 +54,7 @@ class Client:
                         serverPort = serverInforLi[1]["port"]
                         backServerIP = serverInforLi[3]["ip"]
                         backServerPort = serverInforLi[3]["port"]
-                print("currentPosition:{0}, server:{1} {2},backServer:{3} {4}".format(currentPosition, serverIP,serverPort, backServerIP, backServerPort))
+                print("Upload plan: currentPosition:{0}, server:{1} {2},backServer:{3} {4}".format(currentPosition, serverIP,serverPort, backServerIP, backServerPort))
                 f.seek(int((currentPosition - 1)*CONS.BLOCK_SIZE))
                 # print("filePosition:", f.tell())
 
@@ -85,16 +85,17 @@ class Client:
                     client.send(packetData)
 
                     # fileSizeCount = 0
+                    logging.info("File:{0} chunk {1} upload to server:{2}:{3} start...".format(self.fileName, currentPosition, serverIP, serverPort))
                     for i in range(int(CONS.BLOCK_SIZE/CONS.ONCE_READ_FILE_SIZE)):
                         content = f.read(CONS.ONCE_READ_FILE_SIZE)
                         # fileSizeCount = fileSizeCount + len(content)
                         if not content:
+                            # logging.info("File{0} chunk {1} upload finished!".format(self.fileName, currentPosition))
                             break
                         client.send(content)
-
+                    logging.info("File:{0} chunk {1} upload to server:{2}:{3} finished！".format(self.fileName, currentPosition, serverIP, serverPort))
                     # print("length of file send", fileSizeCount)
                     client.close()
-                    logging.info("send file:{0} to server:{1}".format(fileName, serverIP))
                 except Exception as e: #不考虑上传失败
                     client.close()
                     logging.error("send file:{0} to server:{1} fail! {2}".format(fileName, serverIP, e))
@@ -128,7 +129,7 @@ class Client:
             for i, each in enumerate(tempLi):
                 if i < leftBlockSizeNum:
                     start = eachThreadBlockCeilSize * i + 1
-                    end =  eachThreadBlockCeilSize * (i + 1)
+                    end = eachThreadBlockCeilSize * (i + 1)
                     if i == (leftBlockSizeNum - 1):
                         currentPos = end
                         label = i
@@ -144,7 +145,7 @@ class Client:
                                           args=(serverInforLi, start, end))
                 self.threads.append(thread)
                 thread.start()
-                logging.info("start threading{0} to upload file blocks {1}-{2}".format(i+1, start, end))
+                logging.info("start threading{0} to upload file {3} blocks {1}-{2}".format(i+1, start, end, self.fileName))
         else:
             logging.info("file size is not right")
 
@@ -180,8 +181,6 @@ class Client:
                 client = socket(AF_INET, SOCK_STREAM)
                 client.connect((serverIP, serverPort))
 
-                #传递上传文件基本信息
-                # print("packetData length:", len(packetData))
                 client.send(packetData)
 
                 if not os.path.isdir('temp'):
@@ -190,6 +189,7 @@ class Client:
                 with open('temp/{0}'.format(fileName), 'wb') as f:
                     # print("position", currentPosition)
                     # f.seek(CONS.BLOCK_SIZE * (currentPosition - 1))
+                    logging.info("File:{0} chunk {1} download to server:{2}:{3} finished！".format(self.fileName, currentPosition, serverIP, serverPort))
                     while True:
                         revContent = client.recv(CONS.ONCE_READ_FILE_SIZE)
                         # fileSizeCount = fileSizeCount + len(revContent)
@@ -197,7 +197,7 @@ class Client:
                             print("file position:", f.tell())
                             break
                         f.write(revContent)
-
+                    logging.info("File:{0} chunk {1} download to server:{2}:{3} finished！".format(self.fileName, currentPosition, serverIP, serverPort))
                 client.close()
                 logging.info("download file:{0} from server:{1}".format(fileName, serverIP))
             except Exception as e: #不考虑上传失败
@@ -252,7 +252,7 @@ class Client:
                                           args=(serverInforLi, start, end))
                 self.threads.append(thread)
                 thread.start()
-                logging.info("start threading{0} to download file blocks {1}-{2}".format(i+1, start, end))
+                logging.info("start threading{0} to download file{3} blocks {1}-{2}".format(i+1, start, end, self.fileName))
         else:
             logging.info("file size is not right")
 
@@ -299,17 +299,18 @@ def initLog(logName):
 
 if __name__ == "__main__":
     initLog('customer.log')
+    print("********Welcome to client**********")
     client = Client(CONS.PORT_START + 5)
 
     commandLis = ["download", "upload", "abort"]
     while True:
-        print("请选择所要的操作：")
+        print("Please select the operation you want:：")
         inputCmd = input("download, upload, abort?\n")
         fileName = ""
         if inputCmd == commandLis[0]:
-            fileName = input("请输入文件名:")
+            fileName = input("Input the file name:")
             starttime = datetime.datetime.now()
-            logging.info('开始文件下载...{0}'.format(starttime))
+            logging.info('Start to download File {0}...{1}'.format(fileName, starttime))
             client.downloadFile(fileName)
             for t in client.threads:
                 t.join()
@@ -328,24 +329,24 @@ if __name__ == "__main__":
 
             endtime = datetime.datetime.now()
 
-            logging.info('客户端结束时间：{0}'.format(endtime))
-            logging.info('客户端所花时间：{0}'.format(endtime - starttime))
+            logging.info('Client download file{0} end time：{1}'.format(fileName, endtime))
+            logging.info('Total time to download the file{1}：{0}'.format(endtime - starttime,fileName))
         elif inputCmd == commandLis[1]:
             starttime = datetime.datetime.now()
-            fileName = input("请输入文件名:")
-            logging.info('开始文件上传...{0}'.format(starttime))
+            fileName = input("Input the file name:")
+            logging.info('start to upload file{0}...{1}'.format(fileName, starttime))
             client.uploadFile(fileName)
             for t in client.threads:
                 t.join()
             endtime = datetime.datetime.now()
 
-            logging.info('客户端结束时间：{0}'.format(endtime))
-            logging.info('客户端所花时间：{0}'.format(endtime - starttime))
+            logging.info('Client upload file{0} end time：{1}'.format(fileName, endtime))
+            logging.info('Total time to upload the file{1}：{0}'.format(endtime - starttime, fileName))
         elif inputCmd == commandLis[2]:
-            print("想好操作再来^=^")
+            print("Thank you for your use^=^")
             sys.exit()
         else:
-            print("输入不对,再来一遍！")
+            print("Operation is no right, try again")
 
 
 

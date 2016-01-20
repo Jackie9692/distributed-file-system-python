@@ -36,7 +36,6 @@ class Filemonitor:
 		#start to listen port
 		self.waitConnection()
 
-
 	def waitConnection(self):
 		while True:
 			try:
@@ -113,11 +112,10 @@ class Filemonitor:
 
 		self.fileInfo.append(fileInfo)
 
-
 		packetData = pickle.dumps(self.aliveServerData)
 		client.send(packetData)
 		client.close()
-		logging.info("发送上传文件信息到客户端: '{0}' to monitor".format(pickle.unpack(packetData)))
+		logging.info("send upload file information to client: '{0}' to monitor".format(pickle.unpack(packetData)))
 
 	#向客户端返回下载服务器信息
 	def sendServerDownloadInfoToClient(self, dicData, client):
@@ -140,13 +138,13 @@ class Filemonitor:
 			else:
 				logging.warning("file information is not right!!")
 		if not fileExist:
-			logging.warning("服务器不存在此文件")
+			logging.warning("No such file exists!")
 		if len(fileServerInfor) < 2:
-			logging.warning("服务器数量不足")
+			logging.warning("alive server is not enough!")
 		packetData = pickle.dumps(fileServerInfor)
 		client.send(packetData)
 		client.close()
-		logging.info("发送下载文件信息到客户端: '{0}' to monitor".format(pickle.unpack(packetData)))
+		logging.info("send download file information to client: '{0}' to monitor".format(pickle.unpack(packetData)))
 
 	# 服务器信息初始化
 	def initServerInfo(self, dicData):
@@ -168,8 +166,8 @@ class Filemonitor:
 			now = datetime.datetime.now()
 			for each in self.aliveServerData[:]:
 				heartTime = each['heartTime']
-				if (now - heartTime).seconds >= 3:
-					logging.info("服务器{0}:{1}失效！".format(each["ip"], str(each["port"])))
+				if (now - heartTime).seconds >= 5:
+					logging.info("server{0}:{1} refresh fail！".format(each["ip"], str(each["port"])))
 					self.aliveServerData.remove(each)
 					for fileInfo in self.fileInfo:
 						for serverPosition in fileInfo["serverPosition"][:]:
@@ -187,7 +185,7 @@ class Filemonitor:
 			for each in self.aliveServerData[:]:
 				if each["ip"] == ip and each["port"] == port:
 					each["heartTime"] = now
-					logging.info("服务器{0}:{1}更新信息！".format(each["ip"], str(each["port"])))
+					logging.info("server{0}:{1} refreshed！".format(each["ip"], str(each["port"])))
 		else:
 			logging.warning('更新消息有误！')
 
