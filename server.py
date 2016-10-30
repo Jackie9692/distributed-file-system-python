@@ -68,12 +68,13 @@ class FileServer:
 				dicData = pickle.loads(msgDic)
 				if 'msgType' in dicData and 'fileName'in dicData:
 					msgType = dicData['msgType']
-					fileName = dicData['fileName']
 					print("Message type received:", msgType)
 					if msgType == CONS.from_client_01: #上传与备份同一个方法处理
-						self.threads = []
-						starttime = datetime.datetime.now()  #统计服务器从开始接收文件到结束文件上传时间
-						logging.info('Server start receive upload file{0}:{1}'.format(fileName, starttime))
+						threads = []
+						if upLoadTime == -1:
+							upLoadTime = 1
+							starttime = datetime.datetime.now()  #统计服务器从开始接收文件到结束文件上传时间
+							logging.info('服务器开始接收上传文件时间：{0}'.format(starttime))
 
 						thread = threading.Thread(target=self.fromClientUploadmsgHandler,
 												  args=(conn, dicData))#开启进程处理文件上传
@@ -84,11 +85,14 @@ class FileServer:
 							t.join()
 
 						endtime = datetime.datetime.now()
-						logging.info('Server finished receive upload file{0}:{1}'.format(fileName, endtime))
-						logging.info('current file{0} received take time:{1}'.format(fileName, endtime - starttime))
+						logging.info('服务器结束上传文件时间：{0}'.format(endtime))
+						logging.info('当前所用时间：{0}'.format(endtime - starttime))
 					elif msgType == CONS.from_client_02: #下载
 						self.threads = []
-						logging.info('Server start receive upload file{0}:{1}'.format(fileName, starttime))
+						if downLoadTime == -1:
+							upLoadTime = 1
+							starttime = datetime.datetime.now()  #统计服务器从开始下载文件到结束文件下载时间
+							logging.info('服务器开始发送下载文件：{0}'.format(starttime))
 
 						thread = threading.Thread(target=self.fromClientDownloadmsgHandler,
 												  args=(conn, dicData))#开启进程处理文件下载
@@ -97,8 +101,9 @@ class FileServer:
 						thread.start()
 						for t in self.threads:
 							t.join()
-						logging.info('Server finished send download file{0}:{1}'.format(fileName, endtime))
-						logging.info('current file{0} send download file take time:{1}'.format(fileName, endtime - starttime))
+
+						endtime = datetime.datetime.now()
+						logging.info('服务器结束发送下载文件：{0}'.format(endtime))
 					else:
 						conn.close()
 						logging.info('message type error')
@@ -115,7 +120,7 @@ class FileServer:
 				try:
 					serverIP = backServerIP
 					serverPort = dicData["backServerPort"].rstrip()
-					logging.info("send back file to {0}:{1}".format(serverIP, serverPort))
+					logging.info("发送备份到{0} {1}".format(serverIP, serverPort))
 					dicData["backServerIP"] = " " * CONS.SERVER_IP_LENGTH
 					dicData["backServerPort"] = " " * CONS.SERVER_PORT_LENGTH
 
