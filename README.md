@@ -15,10 +15,16 @@ How to run:
 6.在Client上执行"python client.py"。
 
 实验一：上传文件
+
+
 将需要传输的文件（如office.iso）放到client的目录中，然后在client的命令行中输入"upload"，回车，再输入"office.iso"。查看client、server的日志，记录下实验结果。
 
 实验二：下载文件
+
+
 在另外一台服务器上开启client，并在命令行中输入"download"，回车，再输入"office.iso"，文件块会下载到当前目录的tmp文件夹进行拼装，拼装好后会放置在download文件夹。使用hash.exe工具比较上传前和下载后的文件的MD5码有没有变动。查看client、server的日志，记录下实验结果。
 
 实验三：下载文件（1台服务器宕机）
+
+
 关闭一台server的python实例（存储server、备份server均可），然后重复实验二的步骤，记录下实验结果。
