@@ -7,6 +7,7 @@ Brief introduction:
 How to run:
 
 运行步骤:
+
     1.在所有的服务器中配置Python 3的环境。
     
     2.修改./utils/constant.py文件第9行的IP地址（设为Monitor的IP地址）。Server、Client与Monitor连接后，Monitor会记录它们的IP并且广播给其他机器。
